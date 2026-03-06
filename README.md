@@ -112,6 +112,30 @@ console.log(morphemes)
 | `B` | 中単位 | `東京都` / `に` / `行く` |
 | `C` | 長単位（デフォルト）| `東京都` / `に` / `行く` |
 
+
+### `dictionaryConfigPaths(dictPath?, resourceDir?, configPath?)`
+
+`new Dictionary(...)` と同じ引数を受け取り、実際に Sudachi が使う/探索するパス情報を返します。
+
+返り値には以下を含みます：
+
+- `actualConfigPath`: 実際に使用される config パス
+- `actualConfigExists`: その config が存在するか
+- `systemDictCandidates`: 辞書パスの探索候補
+- `charDefCandidates`: `char.def` の探索候補
+
+### `new Dictionary_From_Byte(dictBytes, resourceDir?, configPath?)`
+
+`.dic` ファイルのバイト列から辞書を構築します。`create` / `tokenize` は `Dictionary` と同じです。
+
+```ts
+import { Dictionary_From_Byte } from '@taisan11/sudachi-js-wrapper'
+
+const bytes = await Bun.file('/path/to/system_core.dic').bytes()
+const dict = new Dictionary_From_Byte(Buffer.from(bytes), '/path/to/resources')
+console.log(dict.tokenize('東京都に行く'))
+```
+
 ### `dict.create(mode?)`
 
 `Tokenizer` インスタンスを返します。同じモードで繰り返し解析する場合はこちらが効率的です。
