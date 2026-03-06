@@ -9,7 +9,7 @@ use napi_derive::napi;
 
 use sudachi::analysis::stateful_tokenizer::StatefulTokenizer;
 use sudachi::analysis::Mode;
-use sudachi::config::{default_config_location, Config, ConfigBuilder};
+use sudachi::config::{Config, ConfigBuilder};
 use sudachi::dic::dictionary::JapaneseDictionary;
 use sudachi::dic::storage::{Storage, SudachiDicData};
 use sudachi::prelude::MorphemeList;
@@ -45,12 +45,12 @@ pub struct Dictionary {
 
 #[napi(object)]
 pub struct DictionaryConfigPaths {
-  /// Requested config path. If omitted, default config location is used.
+  /// Requested config path.
   pub requested_config_path: Option<String>,
-  /// Actual config path used by Sudachi (`configPath` or the default location).
-  pub actual_config_path: String,
+  /// Actual config path used by this wrapper. Null when no config file is used.
+  pub actual_config_path: Option<String>,
   /// Whether `actual_config_path` exists on the filesystem.
-  pub actual_config_exists: bool,
+  pub actual_config_exists: Option<bool>,
   /// Candidate paths Sudachi will check for the system dictionary.
   pub system_dict_candidates: Vec<String>,
   /// Candidate paths Sudachi will check for `char.def`.
@@ -152,18 +152,22 @@ pub fn dictionary_config_paths(
   resource_dir: Option<String>,
   config_path: Option<String>,
 ) -> napi::Result<DictionaryConfigPaths> {
-  let requested_config_path = config_path.clone();
-  let actual_config = config_path
-    .map(PathBuf::from)
-    .unwrap_or_else(default_config_location);
+  let requested_config_path = config_path;
+  let config_info = resolve_config_file(requested_config_path.as_deref());
 
-  let mut raw_config = if actual_config.exists() {
-    ConfigBuilder::from_file(&actual_config).map_err(|e| napi::Error::from_reason(e.to_string()))?
+  let mut raw_config = if let Some(actual_config) = config_info.path.as_ref() {
+    let mut from_file = ConfigBuilder::from_file(actual_config)
+      .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+
+    if let Some(parent) = actual_config.parent() {
+      from_file = from_file.root_directory(parent);
+    }
+    from_file
   } else {
     ConfigBuilder::empty()
   };
 
-  if let Some(parent) = actual_config.parent() {
+  if let Some(parent) = config_info.root_directory.as_ref() {
     raw_config = raw_config.root_directory(parent);
   }
   if let Some(resource_dir) = resource_dir {
@@ -189,8 +193,11 @@ pub fn dictionary_config_paths(
 
   Ok(DictionaryConfigPaths {
     requested_config_path,
-    actual_config_path: actual_config.to_string_lossy().into_owned(),
-    actual_config_exists: actual_config.exists(),
+    actual_config_path: config_info
+      .path
+      .as_ref()
+      .map(|path| path.to_string_lossy().into_owned()),
+    actual_config_exists: config_info.path.as_ref().map(|path| path.exists()),
     system_dict_candidates,
     char_def_candidates,
   })
@@ -241,12 +248,62 @@ fn make_config(
   resource_dir: Option<String>,
   config_path: Option<String>,
 ) -> napi::Result<Config> {
-  Config::new(
-    config_path.map(PathBuf::from),
-    resource_dir.map(PathBuf::from),
-    dict_path.map(PathBuf::from),
-  )
-  .map_err(|e| napi::Error::from_reason(e.to_string()))
+  let info = resolve_config_file(config_path.as_deref());
+
+  let mut raw_config = if let Some(path) = info.path {
+    ConfigBuilder::from_file(&path).map_err(|e| napi::Error::from_reason(e.to_string()))?
+  } else {
+    ConfigBuilder::empty()
+  };
+
+  if let Some(resource_dir) = resource_dir {
+    raw_config = raw_config.resource_path(resource_dir);
+  }
+  if let Some(dict_path) = dict_path {
+    raw_config = raw_config.system_dict(dict_path);
+  }
+  if let Some(root_directory) = info.root_directory {
+    raw_config = raw_config.root_directory(root_directory);
+  }
+
+  Ok(raw_config.build())
+}
+
+struct ResolvedConfigFile {
+  path: Option<PathBuf>,
+  root_directory: Option<PathBuf>,
+}
+
+fn resolve_config_file(config_path: Option<&str>) -> ResolvedConfigFile {
+  match config_path {
+    Some(path) => {
+      let path = PathBuf::from(path);
+      let root_directory = path.parent().map(PathBuf::from);
+      ResolvedConfigFile {
+        path: Some(path),
+        root_directory,
+      }
+    }
+    None => {
+      let current_dir_default = std::env::current_dir()
+        .ok()
+        .map(|dir| dir.join("sudachi.json"))
+        .filter(|path| path.exists());
+
+      if let Some(path) = current_dir_default {
+        let root_directory = path.parent().map(PathBuf::from);
+        return ResolvedConfigFile {
+          path: Some(path),
+          root_directory,
+        };
+      }
+
+      ResolvedConfigFile {
+        path: None,
+        root_directory: None,
+      }
+    }
+  }
 }
 
 fn build_dictionary_from_cfg(config: &Config) -> napi::Result<Dictionary> {

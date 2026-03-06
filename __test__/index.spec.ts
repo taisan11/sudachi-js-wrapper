@@ -30,6 +30,8 @@ describe('Dictionary', () => {
   test('dictionaryConfigPaths returns resolved candidates', () => {
     const info = dictionaryConfigPaths?.('nonexistent.dic')
     expect(info).toBeTruthy()
+    expect(info.actualConfigPath).toBeUndefined()
+    expect(info.actualConfigExists).toBeUndefined()
     expect(Array.isArray(info.systemDictCandidates)).toBe(true)
     expect(info.systemDictCandidates.length).toBeGreaterThan(0)
   })

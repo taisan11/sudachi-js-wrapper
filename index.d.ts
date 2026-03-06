@@ -68,12 +68,12 @@ export declare class Tokenizer {
 export declare function dictionaryConfigPaths(dictPath?: string | undefined | null, resourceDir?: string | undefined | null, configPath?: string | undefined | null): DictionaryConfigPaths
 
 export interface DictionaryConfigPaths {
-  /** Requested config path. If omitted, default config location is used. */
+  /** Requested config path. */
   requestedConfigPath?: string
-  /** Actual config path used by Sudachi (`configPath` or the default location). */
-  actualConfigPath: string
+  /** Actual config path used by this wrapper. Null when no config file is used. */
+  actualConfigPath?: string
   /** Whether `actual_config_path` exists on the filesystem. */
-  actualConfigExists: boolean
+  actualConfigExists?: boolean
   /** Candidate paths Sudachi will check for the system dictionary. */
   systemDictCandidates: Array<string>
   /** Candidate paths Sudachi will check for `char.def`. */
