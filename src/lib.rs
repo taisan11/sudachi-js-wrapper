@@ -250,6 +250,14 @@ fn make_config(
 ) -> napi::Result<Config> {
   let info = resolve_config_file(config_path.as_deref());
 
+  if info.path.is_none() {
+    let mut config = Config::minimal_at(resource_dir.unwrap_or_else(|| "resources".to_string()));
+    if let Some(dict_path) = dict_path {
+      config.system_dict = Some(PathBuf::from(dict_path));
+    }
+    return Ok(config);
+  }
+
   let mut raw_config = if let Some(path) = info.path {
     ConfigBuilder::from_file(&path).map_err(|e| napi::Error::from_reason(e.to_string()))?
   } else {
