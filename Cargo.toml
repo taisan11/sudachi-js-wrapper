@@ -11,7 +11,10 @@ crate-type = ["cdylib"]
 [dependencies]
 napi = "3.0.0"
 napi-derive = "3.0.0"
-sudachi = { git = "https://github.com/WorksApplications/sudachi.rs", package = "sudachi" }
+
+[dependencies.sudachi]
+git = "https://github.com/WorksApplications/sudachi.rs"
+package = "sudachi"
 
 [build-dependencies]
 napi-build = "2"
