@@ -1,6 +1,6 @@
 {
   "name": "@taisan11/sudachi-js-wrapper",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Node.js / Bun bindings for sudachi.rs Japanese morphological analyzer",
   "main": "index.js",
   "module": "index.mjs",

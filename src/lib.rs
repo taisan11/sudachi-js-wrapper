@@ -4,12 +4,14 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use napi::bindgen_prelude::Buffer;
 use napi_derive::napi;
 
 use sudachi::analysis::stateful_tokenizer::StatefulTokenizer;
 use sudachi::analysis::Mode;
-use sudachi::config::Config;
+use sudachi::config::{Config, ConfigBuilder};
 use sudachi::dic::dictionary::JapaneseDictionary;
+use sudachi::dic::storage::{Storage, SudachiDicData};
 use sudachi::prelude::MorphemeList;
 
 /// A single morpheme (tokenization result unit)
@@ -41,6 +43,20 @@ pub struct Dictionary {
   inner: Arc<JapaneseDictionary>,
 }
 
+#[napi(object)]
+pub struct DictionaryConfigPaths {
+  /// Requested config path.
+  pub requested_config_path: Option<String>,
+  /// Actual config path used by this wrapper. Null when no config file is used.
+  pub actual_config_path: Option<String>,
+  /// Whether `actual_config_path` exists on the filesystem.
+  pub actual_config_exists: Option<bool>,
+  /// Candidate paths Sudachi will check for the system dictionary.
+  pub system_dict_candidates: Vec<String>,
+  /// Candidate paths Sudachi will check for `char.def`.
+  pub char_def_candidates: Vec<String>,
+}
+
 #[napi]
 impl Dictionary {
   /// Load a dictionary from a compiled system dictionary file.
@@ -54,15 +70,54 @@ impl Dictionary {
     resource_dir: Option<String>,
     config_path: Option<String>,
   ) -> napi::Result<Self> {
-    let config = Config::new(
-      config_path.map(PathBuf::from),
-      resource_dir.map(PathBuf::from),
-      dict_path.map(PathBuf::from),
-    )
-    .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+    let config = make_config(dict_path, resource_dir, config_path)?;
+    build_dictionary_from_cfg(&config)
+  }
 
-    let dict =
-      JapaneseDictionary::from_cfg(&config).map_err(|e| napi::Error::from_reason(e.to_string()))?;
+  /// Create a reusable Tokenizer for this dictionary.
+  ///
+  /// @param mode - Split mode: "A" (short), "B" (middle), "C" (long, default)
+  #[napi]
+  pub fn create(&self, mode: Option<String>) -> napi::Result<Tokenizer> {
+    Ok(Tokenizer {
+      dict: self.inner.clone(),
+      mode: parse_mode(mode.as_deref())?,
+    })
+  }
+
+  /// Tokenize Japanese text and return morphemes.
+  ///
+  /// @param text - Japanese text to analyze
+  /// @param mode - Split mode: "A" (short), "B" (middle), "C" (long, default)
+  #[napi]
+  pub fn tokenize(&self, text: String, mode: Option<String>) -> napi::Result<Vec<Morpheme>> {
+    run_tokenize(&self.inner, &text, parse_mode(mode.as_deref())?)
+  }
+}
+
+/// A Sudachi Japanese dictionary loaded from dictionary bytes.
+#[napi(js_name = "Dictionary_From_Byte")]
+pub struct DictionaryFromByte {
+  inner: Arc<JapaneseDictionary>,
+}
+
+#[napi]
+impl DictionaryFromByte {
+  /// Load a dictionary from dictionary bytes.
+  ///
+  /// @param dictBytes - Compiled system dictionary bytes (.dic file contents)
+  /// @param resourceDir - Optional path to the resource directory (containing char.def, unk.def, etc.)
+  /// @param configPath - Optional path to sudachi.json config file
+  #[napi(constructor)]
+  pub fn new(
+    dict_bytes: Buffer,
+    resource_dir: Option<String>,
+    config_path: Option<String>,
+  ) -> napi::Result<Self> {
+    let config = make_config(None, resource_dir, config_path)?;
+    let storage = SudachiDicData::new(Storage::Owned(dict_bytes.to_vec()));
+    let dict = JapaneseDictionary::from_cfg_storage(&config, storage)
+      .map_err(|e| napi::Error::from_reason(e.to_string()))?;
 
     Ok(Self {
       inner: Arc::new(dict),
@@ -88,6 +143,64 @@ impl Dictionary {
   pub fn tokenize(&self, text: String, mode: Option<String>) -> napi::Result<Vec<Morpheme>> {
     run_tokenize(&self.inner, &text, parse_mode(mode.as_deref())?)
   }
+}
+
+/// Return concrete config-related paths that `new Dictionary()` will use/try.
+#[napi]
+pub fn dictionary_config_paths(
+  dict_path: Option<String>,
+  resource_dir: Option<String>,
+  config_path: Option<String>,
+) -> napi::Result<DictionaryConfigPaths> {
+  let requested_config_path = config_path;
+  let config_info = resolve_config_file(requested_config_path.as_deref());
+
+  let mut raw_config = if let Some(actual_config) = config_info.path.as_ref() {
+    let mut from_file = ConfigBuilder::from_file(actual_config)
+      .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+
+    if let Some(parent) = actual_config.parent() {
+      from_file = from_file.root_directory(parent);
+    }
+    from_file
+  } else {
+    ConfigBuilder::empty()
+  };
+
+  if let Some(parent) = config_info.root_directory.as_ref() {
+    raw_config = raw_config.root_directory(parent);
+  }
+  if let Some(resource_dir) = resource_dir {
+    raw_config = raw_config.resource_path(resource_dir);
+  }
+  if let Some(dict_path) = dict_path {
+    raw_config = raw_config.system_dict(dict_path);
+  }
+
+  let config = raw_config.build();
+
+  let system_dict_candidates = config
+    .system_dict
+    .as_ref()
+    .map(|path| config.resolve_paths(path.to_string_lossy().into_owned()))
+    .unwrap_or_default();
+  let char_def_candidates = config.resolve_paths(
+    config
+      .character_definition_file
+      .to_string_lossy()
+      .into_owned(),
+  );
+
+  Ok(DictionaryConfigPaths {
+    requested_config_path,
+    actual_config_path: config_info
+      .path
+      .as_ref()
+      .map(|path| path.to_string_lossy().into_owned()),
+    actual_config_exists: config_info.path.as_ref().map(|path| path.exists()),
+    system_dict_candidates,
+    char_def_candidates,
+  })
 }
 
 /// A stateful tokenizer bound to a specific dictionary and split mode
@@ -128,6 +241,77 @@ fn parse_mode(mode: Option<&str>) -> napi::Result<Mode> {
     None => Ok(Mode::C),
     Some(m) => Mode::from_str(m).map_err(|e| napi::Error::from_reason(e.to_string())),
   }
+}
+
+fn make_config(
+  dict_path: Option<String>,
+  resource_dir: Option<String>,
+  config_path: Option<String>,
+) -> napi::Result<Config> {
+  let info = resolve_config_file(config_path.as_deref());
+
+  let mut raw_config = if let Some(path) = info.path {
+    ConfigBuilder::from_file(&path).map_err(|e| napi::Error::from_reason(e.to_string()))?
+  } else {
+    ConfigBuilder::empty()
+  };
+
+  if let Some(resource_dir) = resource_dir {
+    raw_config = raw_config.resource_path(resource_dir);
+  }
+  if let Some(dict_path) = dict_path {
+    raw_config = raw_config.system_dict(dict_path);
+  }
+  if let Some(root_directory) = info.root_directory {
+    raw_config = raw_config.root_directory(root_directory);
+  }
+
+  Ok(raw_config.build())
+}
+
+struct ResolvedConfigFile {
+  path: Option<PathBuf>,
+  root_directory: Option<PathBuf>,
+}
+
+fn resolve_config_file(config_path: Option<&str>) -> ResolvedConfigFile {
+  match config_path {
+    Some(path) => {
+      let path = PathBuf::from(path);
+      let root_directory = path.parent().map(PathBuf::from);
+      ResolvedConfigFile {
+        path: Some(path),
+        root_directory,
+      }
+    }
+    None => {
+      let current_dir_default = std::env::current_dir()
+        .ok()
+        .map(|dir| dir.join("sudachi.json"))
+        .filter(|path| path.exists());
+
+      if let Some(path) = current_dir_default {
+        let root_directory = path.parent().map(PathBuf::from);
+        return ResolvedConfigFile {
+          path: Some(path),
+          root_directory,
+        };
+      }
+
+      ResolvedConfigFile {
+        path: None,
+        root_directory: None,
+      }
+    }
+  }
+}
+
+fn build_dictionary_from_cfg(config: &Config) -> napi::Result<Dictionary> {
+  let dict =
+    JapaneseDictionary::from_cfg(config).map_err(|e| napi::Error::from_reason(e.to_string()))?;
+  Ok(Dictionary {
+    inner: Arc::new(dict),
+  })
 }
 
 fn run_tokenize(
