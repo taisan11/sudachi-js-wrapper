@@ -5,11 +5,11 @@ export declare class Dictionary {
   /**
    * Load a dictionary from a compiled system dictionary file.
    *
-   * @param dictPath - Path to the compiled system dictionary (.dic file)
+   * @param dictPath - Optional path to the compiled system dictionary (.dic file). Uses default from config if omitted.
    * @param resourceDir - Optional path to the resource directory (containing char.def, unk.def, etc.)
    * @param configPath - Optional path to sudachi.json config file
    */
-  constructor(dictPath: string, resourceDir?: string | undefined | null, configPath?: string | undefined | null)
+  constructor(dictPath?: string | undefined | null, resourceDir?: string | undefined | null, configPath?: string | undefined | null)
   /**
    * Create a reusable Tokenizer for this dictionary.
    *

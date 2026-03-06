@@ -45,19 +45,19 @@ pub struct Dictionary {
 impl Dictionary {
   /// Load a dictionary from a compiled system dictionary file.
   ///
-  /// @param dictPath - Path to the compiled system dictionary (.dic file)
+  /// @param dictPath - Optional path to the compiled system dictionary (.dic file). Uses default from config if omitted.
   /// @param resourceDir - Optional path to the resource directory (containing char.def, unk.def, etc.)
   /// @param configPath - Optional path to sudachi.json config file
   #[napi(constructor)]
   pub fn new(
-    dict_path: String,
+    dict_path: Option<String>,
     resource_dir: Option<String>,
     config_path: Option<String>,
   ) -> napi::Result<Self> {
     let config = Config::new(
       config_path.map(PathBuf::from),
       resource_dir.map(PathBuf::from),
-      Some(PathBuf::from(dict_path)),
+      dict_path.map(PathBuf::from),
     )
     .map_err(|e| napi::Error::from_reason(e.to_string()))?;
 
