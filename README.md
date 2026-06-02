@@ -12,27 +12,6 @@ Rust 製の日本語形態素解析器 [Sudachi](https://github.com/WorksApplica
 
 ## インストール
 
-GitHub Packages からインストールします。  
-まず `.npmrc` (または `bunfig.toml`) にレジストリを設定してください：
-
-**`.npmrc`**
-
-```ini
-@taisan11:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
-```
-
-**`bunfig.toml`** (Bun を使う場合)
-
-```toml
-[install.scopes]
-"@taisan11" = { registry = "https://npm.pkg.github.com", token = "YOUR_GITHUB_TOKEN" }
-```
-
-`YOUR_GITHUB_TOKEN` は `read:packages` スコープを持つ [Personal Access Token](https://github.com/settings/tokens) に置き換えてください。
-
-次にインストール：
-
 ```bash
 # Bun
 bun add @taisan11/sudachi-js-wrapper
@@ -180,7 +159,9 @@ bun test
 
 ## リリース
 
-`v` プレフィックス付きのタグを push すると GitHub Actions が自動的に各プラットフォーム向けバイナリをビルドし、GitHub Packages に publish します。
+`v` プレフィックス付きのタグを push すると GitHub Actions が自動的に各プラットフォーム向けバイナリをビルドし、npm に publish します。
+
+publish にはリポジトリの Secrets に `NPM_TOKEN` (npm の [Automation トークン](https://www.npmjs.com/settings/tokens) 推奨) が必要です。
 
 ```bash
 # バージョンを上げてタグを作成・push
