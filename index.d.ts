@@ -25,6 +25,32 @@ export declare class Dictionary {
   tokenize(text: string, mode?: string | undefined | null): Array<Morpheme>
 }
 
+/** A Sudachi Japanese dictionary loaded from dictionary bytes. */
+export declare class Dictionary_From_Byte {
+  /**
+   * Load a dictionary from dictionary bytes.
+   *
+   * @param dictBytes - Compiled system dictionary bytes (.dic file contents)
+   * @param resourceDir - Optional path to the resource directory (containing char.def, unk.def, etc.)
+   * @param configPath - Optional path to sudachi.json config file
+   */
+  constructor(dictBytes: Buffer, resourceDir?: string | undefined | null, configPath?: string | undefined | null)
+  /**
+   * Create a reusable Tokenizer for this dictionary.
+   *
+   * @param mode - Split mode: "A" (short), "B" (middle), "C" (long, default)
+   */
+  create(mode?: string | undefined | null): Tokenizer
+  /**
+   * Tokenize Japanese text and return morphemes.
+   *
+   * @param text - Japanese text to analyze
+   * @param mode - Split mode: "A" (short), "B" (middle), "C" (long, default)
+   */
+  tokenize(text: string, mode?: string | undefined | null): Array<Morpheme>
+}
+export type DictionaryFromByte = Dictionary_From_Byte
+
 /** A stateful tokenizer bound to a specific dictionary and split mode */
 export declare class Tokenizer {
   /**
@@ -36,6 +62,22 @@ export declare class Tokenizer {
   tokenize(text: string, mode?: string | undefined | null): Array<Morpheme>
   /** The split mode of this tokenizer ("A", "B", or "C") */
   get mode(): string
+}
+
+/** Return concrete config-related paths that `new Dictionary()` will use/try. */
+export declare function dictionaryConfigPaths(dictPath?: string | undefined | null, resourceDir?: string | undefined | null, configPath?: string | undefined | null): DictionaryConfigPaths
+
+export interface DictionaryConfigPaths {
+  /** Requested config path. */
+  requestedConfigPath?: string
+  /** Actual config path used by this wrapper. Null when no config file is used. */
+  actualConfigPath?: string
+  /** Whether `actual_config_path` exists on the filesystem. */
+  actualConfigExists?: boolean
+  /** Candidate paths Sudachi will check for the system dictionary. */
+  systemDictCandidates: Array<string>
+  /** Candidate paths Sudachi will check for `char.def`. */
+  charDefCandidates: Array<string>
 }
 
 /** A single morpheme (tokenization result unit) */
