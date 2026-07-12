@@ -40,8 +40,8 @@ unzip dict.zip
 import { Dictionary } from '@taisan11/sudachi-js-wrapper'
 
 const dict = new Dictionary(
-  '/path/to/system_core.dic',   // 辞書ファイルのパス（必須）
-  '/path/to/resources',         // リソースディレクトリ (char.def 等) （省略可）
+  '/path/to/system_core.dic', // 辞書ファイルのパス（必須）
+  '/path/to/resources', // リソースディレクトリ (char.def 等) （省略可）
 )
 
 const morphemes = dict.tokenize('東京都に行く')
@@ -68,29 +68,28 @@ console.log(morphemes)
 
 ### `new Dictionary(dictPath, resourceDir?, configPath?)`
 
-| 引数 | 型 | 説明 |
-|---|---|---|
-| `dictPath` | `string` | コンパイル済み辞書ファイル (`.dic`) のパス |
+| 引数          | 型        | 説明                                                |
+| ------------- | --------- | --------------------------------------------------- |
+| `dictPath`    | `string`  | コンパイル済み辞書ファイル (`.dic`) のパス          |
 | `resourceDir` | `string?` | `char.def` / `unk.def` 等を含むリソースディレクトリ |
-| `configPath` | `string?` | `sudachi.json` 設定ファイルのパス |
+| `configPath`  | `string?` | `sudachi.json` 設定ファイルのパス                   |
 
 ### `dict.tokenize(text, mode?)`
 
 テキストを形態素解析し、`Morpheme[]` を返します。
 
-| 引数 | 型 | デフォルト | 説明 |
-|---|---|---|---|
-| `text` | `string` | — | 解析対象テキスト |
-| `mode` | `"A" \| "B" \| "C"` | `"C"` | 分割モード |
+| 引数   | 型                  | デフォルト | 説明             |
+| ------ | ------------------- | ---------- | ---------------- |
+| `text` | `string`            | —          | 解析対象テキスト |
+| `mode` | `"A" \| "B" \| "C"` | `"C"`      | 分割モード       |
 
 分割モードの違い：
 
-| モード | 粒度 | 例 |
-|---|---|---|
-| `A` | 短単位 | `東京` / `都` / `に` / `行く` |
-| `B` | 中単位 | `東京都` / `に` / `行く` |
-| `C` | 長単位（デフォルト）| `東京都` / `に` / `行く` |
-
+| モード | 粒度                 | 例                            |
+| ------ | -------------------- | ----------------------------- |
+| `A`    | 短単位               | `東京` / `都` / `に` / `行く` |
+| `B`    | 中単位               | `東京都` / `に` / `行く`      |
+| `C`    | 長単位（デフォルト） | `東京都` / `に` / `行く`      |
 
 ### `dictionaryConfigPaths(dictPath?, resourceDir?, configPath?)`
 
@@ -127,17 +126,17 @@ tokenizer.tokenize('東京都に行く')
 
 ### `Morpheme` オブジェクト
 
-| プロパティ | 型 | 説明 |
-|---|---|---|
-| `surface` | `string` | 表層形（元テキストの部分文字列） |
-| `partOfSpeech` | `string[]` | 品詞情報 6要素 `[品詞, 品詞細分類1, …, 活用型, 活用形]` |
-| `readingForm` | `string` | 読み（カタカナ） |
-| `dictionaryForm` | `string` | 辞書形（終止形） |
-| `normalizedForm` | `string` | 正規化形 |
-| `isOov` | `boolean` | 未知語かどうか |
-| `begin` | `number` | 元テキスト中の開始バイトオフセット |
-| `end` | `number` | 元テキスト中の終了バイトオフセット |
-| `dictionaryId` | `number` | 辞書 ID（未知語は `-1`） |
+| プロパティ       | 型         | 説明                                                    |
+| ---------------- | ---------- | ------------------------------------------------------- |
+| `surface`        | `string`   | 表層形（元テキストの部分文字列）                        |
+| `partOfSpeech`   | `string[]` | 品詞情報 6要素 `[品詞, 品詞細分類1, …, 活用型, 活用形]` |
+| `readingForm`    | `string`   | 読み（カタカナ）                                        |
+| `dictionaryForm` | `string`   | 辞書形（終止形）                                        |
+| `normalizedForm` | `string`   | 正規化形                                                |
+| `isOov`          | `boolean`  | 未知語かどうか                                          |
+| `begin`          | `number`   | 元テキスト中の開始バイトオフセット                      |
+| `end`            | `number`   | 元テキスト中の終了バイトオフセット                      |
+| `dictionaryId`   | `number`   | 辞書 ID（未知語は `-1`）                                |
 
 ## ローカルでビルドする
 
@@ -161,7 +160,9 @@ bun test
 
 `v` プレフィックス付きのタグを push すると GitHub Actions が自動的に各プラットフォーム向けバイナリをビルドし、npm に publish します。
 
-publish にはリポジトリの Secrets に `NPM_TOKEN` (npm の [Automation トークン](https://www.npmjs.com/settings/tokens) 推奨) が必要です。
+publish 先は npm registry (`https://registry.npmjs.org/`) です。GitHub Packages (`npm.pkg.github.com`) は使用しません。
+
+publish にはリポジトリの Secrets に `NPM_TOKEN` (npm の [Automation トークン](https://www.npmjs.com/settings/tokens) 推奨) が必要です。GitHub Actions から npm provenance 付きで公開するため、workflow には `id-token: write` 権限も設定しています。
 
 ```bash
 # バージョンを上げてタグを作成・push
@@ -174,4 +175,3 @@ git push origin main --tags
 MIT © taisan11
 
 本パッケージが使用する [sudachi.rs](https://github.com/WorksApplications/sudachi.rs) および [SudachiDict](https://github.com/WorksApplications/SudachiDict) はそれぞれ Apache 2.0 ライセンスのもとで配布されています。
-
