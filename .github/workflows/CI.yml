@@ -124,7 +124,8 @@ jobs:
     name: Publish to npm
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      id-token: write
     needs:
       - lint
       - test
@@ -150,10 +151,9 @@ jobs:
       - name: Move artifacts
         run: bun run artifacts
       - name: List packages
-        run: ls -R ./npm
+        run: find ./npm -maxdepth 2 -type f -name package.json -print
         shell: bash
-      - name: Publish
-        run: npm publish --access public
+      - name: Publish to npm registry
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
