@@ -164,9 +164,19 @@ publish 先は npm registry (`https://registry.npmjs.org/`) です。GitHub Pack
 
 publish にはリポジトリの Secrets に `NPM_TOKEN` (npm の [Automation トークン](https://www.npmjs.com/settings/tokens) 推奨) が必要です。GitHub Actions から npm provenance 付きで公開するため、workflow には `id-token: write` 権限も設定しています。
 
+### npm 移行時にやること
+
+PR を merge する前後で、以下を確認してください。
+
+1. npm で `@taisan11` scope を使えるアカウントでログインし、必要なら Organization / scope を作成する。
+2. npm の Automation token を作成し、GitHub repository secrets に `NPM_TOKEN` として登録する。
+3. GitHub Packages 向けの `.npmrc` (`npm.pkg.github.com` や `GITHUB_TOKEN` を参照する設定) がローカルや CI に残っていないことを確認する。
+4. PR を merge したあと、バージョンタグを push して release workflow を実行する。
+5. workflow 完了後に npm の package page と `npm install @taisan11/sudachi-js-wrapper` で公開結果を確認する。
+
 ```bash
 # バージョンを上げてタグを作成・push
-bun run version patch   # または minor / major
+bun run version patch # または minor / major
 git push origin main --tags
 ```
 
